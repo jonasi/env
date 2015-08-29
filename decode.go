@@ -146,22 +146,28 @@ func ToUnderscore(str string) string {
 	var (
 		parts = []string{}
 		cur   = []rune{}
-		last  rune
+		last2 = [2]rune{}
 	)
 
 	for _, c := range str {
 		if unicode.IsUpper(c) {
-			if last != 0 && unicode.IsLower(last) {
+			if last2[1] != 0 && unicode.IsLower(last2[1]) {
 				parts = append(parts, string(cur))
 				cur = nil
 			}
 
 			cur = append(cur, unicode.ToLower(c))
 		} else {
+			if last2[0] != 0 && last2[1] != 0 && unicode.IsUpper(last2[0]) && unicode.IsUpper(last2[1]) {
+				parts = append(parts, string(cur[:len(cur)-1]))
+				cur = []rune{cur[len(cur)-1]}
+			}
+
 			cur = append(cur, c)
 		}
 
-		last = c
+		last2[0] = last2[1]
+		last2[1] = c
 	}
 
 	if len(cur) > 0 {

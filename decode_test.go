@@ -34,6 +34,7 @@ var testUnderscore = map[string]string{
 	"oneTwo":  "one_two",
 	"oneTWO":  "one_two",
 	"oneTwoT": "one_two_t",
+	"ONETwo":  "one_two",
 }
 
 func TestUnderscore(t *testing.T) {
