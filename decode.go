@@ -143,13 +143,30 @@ func KeyIdentity(str string) string {
 }
 
 func ToUnderscore(str string) string {
-	cp := str
+	var (
+		parts = []string{}
+		cur   = []rune{}
+		last  rune
+	)
 
 	for _, c := range str {
 		if unicode.IsUpper(c) {
+			if last != 0 && unicode.IsLower(last) {
+				parts = append(parts, string(cur))
+				cur = nil
+			}
 
+			cur = append(cur, unicode.ToLower(c))
+		} else {
+			cur = append(cur, c)
 		}
+
+		last = c
 	}
 
-	return cp
+	if len(cur) > 0 {
+		parts = append(parts, string(cur))
+	}
+
+	return strings.Join(parts, "_")
 }
