@@ -1,7 +1,8 @@
 package decode
 
 import (
-	"errors"
+	"encoding"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -16,10 +17,6 @@ const (
 
 var (
 	DefaultKeyFunc = KeyIdentity
-)
-
-var (
-	ErrInvalidKind = errors.New("Dest value must be a struct pointer")
 )
 
 type Options struct {
@@ -43,13 +40,13 @@ func Decode(args []string, dest interface{}, opts *Options) error {
 	rootVal := reflect.ValueOf(dest)
 
 	if rootVal.Kind() != reflect.Ptr {
-		return ErrInvalidKind
+		return fmt.Errorf("Expected pointer to struct, got %s", rootVal.Kind())
 	}
 
 	rootVal = rootVal.Elem()
 
 	if rootVal.Kind() != reflect.Struct {
-		return ErrInvalidKind
+		return fmt.Errorf("Expected pointer to struct, got pointer to %s", rootVal.Kind())
 	}
 
 	if opts == nil {
@@ -77,7 +74,23 @@ func decodeStruct(val reflect.Value, argsMap map[string]string, opts *Options, p
 
 		fieldVal := val.Field(i)
 
-		k := opts.KeyFunc(field.Name)
+		if fieldVal.Kind() == reflect.Struct {
+			decodeStruct(fieldVal, argsMap, opts, prefix+field.Name+opts.Separator)
+			continue
+		}
+
+		if fieldVal.Kind() == reflect.Ptr && fieldVal.Type().Elem().Kind() == reflect.Struct {
+			if fieldVal.IsNil() {
+				fieldVal.Set(reflect.New(fieldVal.Type().Elem()))
+				fieldVal = fieldVal.Elem()
+			}
+
+			decodeStruct(fieldVal, argsMap, opts, prefix+field.Name+opts.Separator)
+
+			continue
+		}
+
+		k := opts.KeyFunc(prefix + field.Name)
 
 		if v, ok := argsMap[k]; ok {
 			decodeValue(fieldVal, v, opts)
@@ -85,19 +98,49 @@ func decodeStruct(val reflect.Value, argsMap map[string]string, opts *Options, p
 	}
 }
 
+var unmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
+func checkInterface(val reflect.Value, str string) bool {
+	if val.Type().Implements(unmarshaler) {
+		val.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(str))
+		return true
+	}
+
+	return false
+}
+
+// decode a string into a value
 func decodeValue(val reflect.Value, str string, opts *Options) {
+	if checkInterface(val, str) {
+		return
+	}
+
 	for val.Kind() == reflect.Ptr {
 		if val.IsNil() {
-			val.Set(reflect.New(val.Type()))
+			val.Set(reflect.New(val.Type().Elem()))
+		}
+
+		if checkInterface(val, str) {
+			return
 		}
 
 		val = val.Elem()
 	}
 
+	if checkInterface(val, str) {
+		return
+	}
+
 	switch val.Kind() {
 	case reflect.Slice:
+		str = strings.TrimSpace(str)
+		if str == "" {
+			val.Set(reflect.MakeSlice(val.Type(), 0, 0))
+			return
+		}
+
 		parts := strings.Split(str, opts.SliceSeparator)
-		sliceVal := reflect.MakeSlice(val.Elem().Type(), len(parts), len(parts))
+		sliceVal := reflect.MakeSlice(val.Type(), len(parts), len(parts))
 
 		for i, p := range parts {
 			p = strings.TrimSpace(p)
