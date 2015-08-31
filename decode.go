@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DefaultSeparator      = "::"
+	DefaultSeparator      = "__"
 	DefaultSliceSeparator = ","
 )
 
@@ -27,9 +27,17 @@ type Options struct {
 }
 
 func setDefaults(o *Options) {
-	o.Separator = DefaultSeparator
-	o.SliceSeparator = DefaultSliceSeparator
-	o.KeyFunc = DefaultKeyFunc
+	if o.Separator == "" {
+		o.Separator = DefaultSeparator
+	}
+
+	if o.SliceSeparator == "" {
+		o.SliceSeparator = DefaultSliceSeparator
+	}
+
+	if o.KeyFunc == nil {
+		o.KeyFunc = DefaultKeyFunc
+	}
 }
 
 func DecodeEnv(dest interface{}, opts *Options) error {
@@ -56,6 +64,7 @@ func Decode(args []string, dest interface{}, opts *Options) error {
 	setDefaults(opts)
 
 	argsMap := argsMap(args)
+
 	decodeStruct(rootVal, argsMap, opts, opts.Prefix)
 
 	return nil
