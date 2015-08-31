@@ -10,20 +10,23 @@ import (
 	"unicode"
 )
 
+// Default option values
 const (
 	DefaultSeparator      = "__"
 	DefaultSliceSeparator = ","
 )
 
+// Default option values
 var (
 	DefaultMapper = IdentityMapper
 )
 
+// Options is the set of decode options
 type Options struct {
-	Prefix         string
-	Separator      string
-	SliceSeparator string
-	Mapper         func(string) string
+	Prefix         string              // String prefix that is stripped from each entry
+	Separator      string              // String value for nested values
+	SliceSeparator string              // Separator for slices encoded as strings
+	Mapper         func(string) string // Mapping function for struct key names
 }
 
 func setDefaults(o *Options) {
@@ -40,10 +43,15 @@ func setDefaults(o *Options) {
 	}
 }
 
+// DecodeEnv calls `Decode` with `os.Args`
 func DecodeEnv(dest interface{}, opts *Options) error {
 	return Decode(os.Environ(), dest, opts)
 }
 
+// Decode decodes the provided env entries (each in the form of X=Y) according to
+// the options and sets them on the dest value
+//
+// dest must be a pointer to struct, otherwise an error will be returned.
 func Decode(args []string, dest interface{}, opts *Options) error {
 	rootVal := reflect.ValueOf(dest)
 
@@ -190,10 +198,13 @@ func argsMap(args []string) map[string]string {
 	return m
 }
 
+// IdentityMapper returns the input string
 func IdentityMapper(str string) string {
 	return str
 }
 
+// UnderscoreMapper converts CamelCase strings to their camel_case
+// counterpart
 func UnderscoreMapper(str string) string {
 	var (
 		parts = []string{}
