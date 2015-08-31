@@ -16,14 +16,14 @@ const (
 )
 
 var (
-	DefaultKeyFunc = KeyIdentity
+	DefaultMapper = IdentityMapper
 )
 
 type Options struct {
 	Prefix         string
 	Separator      string
 	SliceSeparator string
-	KeyFunc        func(string) string
+	Mapper         func(string) string
 }
 
 func setDefaults(o *Options) {
@@ -35,8 +35,8 @@ func setDefaults(o *Options) {
 		o.SliceSeparator = DefaultSliceSeparator
 	}
 
-	if o.KeyFunc == nil {
-		o.KeyFunc = DefaultKeyFunc
+	if o.Mapper == nil {
+		o.Mapper = DefaultMapper
 	}
 }
 
@@ -99,7 +99,7 @@ func decodeStruct(val reflect.Value, argsMap map[string]string, opts *Options, p
 			continue
 		}
 
-		k := opts.KeyFunc(prefix + field.Name)
+		k := opts.Mapper(prefix + field.Name)
 
 		if v, ok := argsMap[k]; ok {
 			decodeValue(fieldVal, v, opts)
@@ -190,11 +190,11 @@ func argsMap(args []string) map[string]string {
 	return m
 }
 
-func KeyIdentity(str string) string {
+func IdentityMapper(str string) string {
 	return str
 }
 
-func ToUnderscore(str string) string {
+func UnderscoreMapper(str string) string {
 	var (
 		parts = []string{}
 		cur   = []rune{}

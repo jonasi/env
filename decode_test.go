@@ -120,7 +120,7 @@ var testUnderscore = map[string]string{
 
 func TestUnderscore(t *testing.T) {
 	for str, exp := range testUnderscore {
-		act := ToUnderscore(str)
+		act := UnderscoreMapper(str)
 
 		if exp != act {
 			t.Errorf("ToUnderscore error for string %s. Expected %s, but received %s", str, exp, act)
