@@ -90,9 +90,9 @@ func TestNestedStruct(t *testing.T) {
 	}
 
 	args := []string{
-		"Inside::X=hello",
-		"Pointer::X=8",
-		"Deeper::EvenDeeper::X=true",
+		"Inside__X=hello",
+		"Pointer__X=8",
+		"Deeper__EvenDeeper__X=true",
 	}
 
 	Decode(args, &dest, nil)
