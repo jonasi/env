@@ -1,8 +1,8 @@
-## EnvDecode
+## Env
 
 ```go
-import "github.com/jonasi/envdecode"
+import "github.com/jonasi/env"
 ```
 
 #### Docs
-[![GoDoc](https://godoc.org/github.com/jonasi/envdecode?status.svg)](https://godoc.org/github.com/jonasi/envdecode)
+[![GoDoc](https://godoc.org/github.com/jonasi/env?status.svg)](https://godoc.org/github.com/jonasi/env)
