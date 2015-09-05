@@ -110,7 +110,8 @@ func (s *structNode) Decode(v reflect.Value, opts *Options) {
 			continue
 		}
 
-		node, ok := s.children[field.Name]
+		name := opts.Mapper(field.Name)
+		node, ok := s.children[name]
 
 		if !ok {
 			continue
@@ -200,15 +201,18 @@ func parse(data []string, opts *Options) *structNode {
 			k, v  = parts[0], ""
 		)
 
-		if opts.Prefix != "" && !strings.HasPrefix(k, opts.Prefix) {
-			continue
+		if opts.Prefix != "" {
+			if !strings.HasPrefix(k, opts.Prefix) {
+				continue
+			}
+
+			k = k[len(opts.Prefix):]
 		}
 
 		if len(parts) > 1 {
 			v = parts[1]
 		}
 
-		k = k[len(opts.Prefix):]
 		v = strings.TrimSpace(v)
 
 		var (

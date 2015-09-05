@@ -134,3 +134,21 @@ func TestUnmarshalPrefix(t *testing.T) {
 		t.Errorf("Expected %#v, found %#v", "hello", dest.String)
 	}
 }
+
+func TestUnmarshalMapper(t *testing.T) {
+	var dest struct {
+		String string
+	}
+
+	args := []string{
+		"string=hello",
+	}
+
+	Unmarshal(args, &dest, &Options{
+		Mapper: UnderscoreMapper,
+	})
+
+	if dest.String != "hello" {
+		t.Errorf("Expected %#v, found %#v", "hello", dest.String)
+	}
+}
