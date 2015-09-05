@@ -1,4 +1,4 @@
-package envdecode
+package env
 
 import (
 	"reflect"
@@ -58,14 +58,14 @@ func TestSimpleDecode(t *testing.T) {
 
 	for _, v := range testSimple {
 		rv := reflect.New(reflect.TypeOf(v.value))
-		decodeValue(rv, v.string, opts)
+		(&stringNode{value: v.string}).Decode(rv, opts)
 
 		if !reflect.DeepEqual(rv.Elem().Interface(), v.value) {
 			t.Errorf("decodeValue error for str %s and type %s.  Expected %v and got %v", v.string, rv.Type().String(), v.value, rv.Interface())
 		}
 
 		rv = rv.Elem()
-		decodeValue(rv, v.string, opts)
+		(&stringNode{value: v.string}).Decode(rv, opts)
 
 		if !reflect.DeepEqual(rv.Interface(), v.value) {
 			t.Errorf("decodeValue error for str %s and type %s.  Expected %v and got %v", v.string, rv.Type().String(), v.value, rv.Interface())
@@ -77,6 +77,7 @@ func TestNestedStruct(t *testing.T) {
 	var dest struct {
 		Inside struct {
 			X string
+			y string
 		}
 		Pointer *struct {
 			X int
@@ -91,11 +92,13 @@ func TestNestedStruct(t *testing.T) {
 
 	args := []string{
 		"Inside__X=hello",
+		"Inside__Y=something",
+		"Inside__y=else",
 		"Pointer__X=8",
 		"Deeper__EvenDeeper__X=true",
 	}
 
-	Decode(args, &dest, nil)
+	Unmarshal(args, &dest, nil)
 
 	if dest.Inside.X != "hello" {
 		t.Errorf("unexpected nested struct value.  Expected %s and found %s", "hello", dest.Inside.X)
@@ -108,22 +111,8 @@ func TestNestedStruct(t *testing.T) {
 	if dest.Deeper.EvenDeeper.X != true {
 		t.Errorf("unexpected nested struct value.  Expected %v and found %v", true, dest.Deeper.EvenDeeper.X)
 	}
-}
 
-var testUnderscore = map[string]string{
-	"OneTwo":  "one_two",
-	"oneTwo":  "one_two",
-	"oneTWO":  "one_two",
-	"oneTwoT": "one_two_t",
-	"ONETwo":  "one_two",
-}
-
-func TestUnderscore(t *testing.T) {
-	for str, exp := range testUnderscore {
-		act := UnderscoreMapper(str)
-
-		if exp != act {
-			t.Errorf("ToUnderscore error for string %s. Expected %s, but received %s", str, exp, act)
-		}
+	if dest.Inside.y != "" {
+		t.Errorf("unexpected nested unexported struct value. Expected \"\" and found %v", dest.Inside.y)
 	}
 }

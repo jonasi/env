@@ -1,4 +1,4 @@
-package envdecode
+package env
 
 import (
 	"encoding"
@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 // Default option values
@@ -44,15 +43,15 @@ func setDefaults(o *Options) {
 }
 
 // DecodeEnv calls `Decode` with `os.Args`
-func DecodeEnv(dest interface{}, opts *Options) error {
-	return Decode(os.Environ(), dest, opts)
+func UnmarshalEnv(dest interface{}, opts *Options) error {
+	return Unmarshal(os.Environ(), dest, opts)
 }
 
 // Decode decodes the provided env entries (each in the form of X=Y) according to
 // the options and sets them on the dest value
 //
 // dest must be a pointer to struct, otherwise an error will be returned.
-func Decode(args []string, dest interface{}, opts *Options) error {
+func Unmarshal(data []string, dest interface{}, opts *Options) error {
 	rootVal := reflect.ValueOf(dest)
 
 	if rootVal.Kind() != reflect.Ptr {
@@ -71,48 +70,10 @@ func Decode(args []string, dest interface{}, opts *Options) error {
 
 	setDefaults(opts)
 
-	argsMap := argsMap(args)
-
-	decodeStruct(rootVal, argsMap, opts, opts.Prefix)
+	tree := parse(data, opts)
+	tree.Decode(rootVal, opts)
 
 	return nil
-}
-
-func decodeStruct(val reflect.Value, argsMap map[string]string, opts *Options, prefix string) {
-	valType := val.Type()
-
-	for i := 0; i < val.NumField(); i++ {
-		field := valType.Field(i)
-
-		// unexported
-		if field.PkgPath != "" {
-			continue
-		}
-
-		fieldVal := val.Field(i)
-
-		if fieldVal.Kind() == reflect.Struct {
-			decodeStruct(fieldVal, argsMap, opts, prefix+field.Name+opts.Separator)
-			continue
-		}
-
-		if fieldVal.Kind() == reflect.Ptr && fieldVal.Type().Elem().Kind() == reflect.Struct {
-			if fieldVal.IsNil() {
-				fieldVal.Set(reflect.New(fieldVal.Type().Elem()))
-				fieldVal = fieldVal.Elem()
-			}
-
-			decodeStruct(fieldVal, argsMap, opts, prefix+field.Name+opts.Separator)
-
-			continue
-		}
-
-		k := opts.Mapper(prefix + field.Name)
-
-		if v, ok := argsMap[k]; ok {
-			decodeValue(fieldVal, v, opts)
-		}
-	}
 }
 
 var unmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
@@ -126,8 +87,56 @@ func checkInterface(val reflect.Value, str string) bool {
 	return false
 }
 
-// decode a string into a value
-func decodeValue(val reflect.Value, str string, opts *Options) {
+type node interface {
+	Decode(reflect.Value, *Options)
+}
+
+type structNode struct {
+	children map[string]node
+}
+
+func (s *structNode) Decode(v reflect.Value, opts *Options) {
+	if v.Kind() != reflect.Struct {
+		panic("complexNode.Decode requires a struct, found " + v.Kind().String())
+	}
+
+	valType := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := valType.Field(i)
+
+		// unexported
+		if field.PkgPath != "" {
+			continue
+		}
+
+		node, ok := s.children[field.Name]
+
+		if !ok {
+			continue
+		}
+
+		fieldVal := v.Field(i)
+
+		if fieldVal.Kind() == reflect.Ptr && fieldVal.Type().Elem().Kind() == reflect.Struct {
+			if fieldVal.IsNil() {
+				fieldVal.Set(reflect.New(fieldVal.Type().Elem()))
+			}
+
+			fieldVal = fieldVal.Elem()
+		}
+
+		node.Decode(fieldVal, opts)
+	}
+}
+
+type stringNode struct {
+	value string
+}
+
+func (s *stringNode) Decode(val reflect.Value, opts *Options) {
+	str := s.value
+
 	if checkInterface(val, str) {
 		return
 	}
@@ -161,7 +170,7 @@ func decodeValue(val reflect.Value, str string, opts *Options) {
 
 		for i, p := range parts {
 			p = strings.TrimSpace(p)
-			decodeValue(sliceVal.Index(i), p, opts)
+			(&stringNode{p}).Decode(sliceVal.Index(i), opts)
 		}
 
 		val.Set(sliceVal)
@@ -182,60 +191,40 @@ func decodeValue(val reflect.Value, str string, opts *Options) {
 	}
 }
 
-func argsMap(args []string) map[string]string {
-	m := map[string]string{}
+func parse(data []string, opts *Options) *structNode {
+	m := &structNode{map[string]node{}}
 
-	for _, a := range args {
-		parts := strings.SplitN(a, "=", 2)
+	for _, a := range data {
+		var (
+			parts = strings.SplitN(a, "=", 2)
+			k, v  = parts[0], ""
+		)
 
-		if len(parts) == 1 {
-			m[parts[0]] = ""
-		} else {
-			m[parts[0]] = parts[1]
+		if len(parts) > 1 {
+			v = parts[1]
+		}
+
+		v = strings.TrimSpace(v)
+
+		var (
+			kparts = strings.Split(k, opts.Separator)
+			cur    = m
+		)
+
+		for i, k := range kparts {
+			if i == len(kparts)-1 {
+				cur.children[k] = &stringNode{v}
+			} else {
+				if _, ok := cur.children[k]; !ok {
+					cur.children[k] = &structNode{map[string]node{}}
+				}
+
+				// todo - panic if we find a simple node here
+
+				cur = cur.children[k].(*structNode)
+			}
 		}
 	}
 
 	return m
-}
-
-// IdentityMapper returns the input string
-func IdentityMapper(str string) string {
-	return str
-}
-
-// UnderscoreMapper converts CamelCase strings to their camel_case
-// counterpart
-func UnderscoreMapper(str string) string {
-	var (
-		parts = []string{}
-		cur   = []rune{}
-		last2 = [2]rune{}
-	)
-
-	for _, c := range str {
-		if unicode.IsUpper(c) {
-			if last2[1] != 0 && unicode.IsLower(last2[1]) {
-				parts = append(parts, string(cur))
-				cur = nil
-			}
-
-			cur = append(cur, unicode.ToLower(c))
-		} else {
-			if last2[0] != 0 && last2[1] != 0 && unicode.IsUpper(last2[0]) && unicode.IsUpper(last2[1]) {
-				parts = append(parts, string(cur[:len(cur)-1]))
-				cur = []rune{cur[len(cur)-1]}
-			}
-
-			cur = append(cur, c)
-		}
-
-		last2[0] = last2[1]
-		last2[1] = c
-	}
-
-	if len(cur) > 0 {
-		parts = append(parts, string(cur))
-	}
-
-	return strings.Join(parts, "_")
 }
