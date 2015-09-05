@@ -51,7 +51,7 @@ var testSimple = []struct {
 	{"12", &intWrapper{12}},
 }
 
-func TestSimpleDecode(t *testing.T) {
+func TestUnmarshalSimple(t *testing.T) {
 	opts := &Options{
 		SliceSeparator: ",",
 	}
@@ -73,7 +73,7 @@ func TestSimpleDecode(t *testing.T) {
 	}
 }
 
-func TestNestedStruct(t *testing.T) {
+func TestUnmarshalNestedStruct(t *testing.T) {
 	var dest struct {
 		Inside struct {
 			X string
@@ -114,5 +114,23 @@ func TestNestedStruct(t *testing.T) {
 
 	if dest.Inside.y != "" {
 		t.Errorf("unexpected nested unexported struct value. Expected \"\" and found %v", dest.Inside.y)
+	}
+}
+
+func TestUnmarshalPrefix(t *testing.T) {
+	var dest struct {
+		String string
+	}
+
+	args := []string{
+		"prefix__String=hello",
+	}
+
+	Unmarshal(args, &dest, &Options{
+		Prefix: "prefix__",
+	})
+
+	if dest.String != "hello" {
+		t.Errorf("Expected %#v, found %#v", "hello", dest.String)
 	}
 }

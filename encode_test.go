@@ -60,3 +60,23 @@ func TestMarshal(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalPrefix(t *testing.T) {
+	var data struct {
+		String string
+	}
+
+	data.String = "hello"
+
+	out, err := Marshal(data, &Options{
+		Prefix: "prefix__",
+	})
+
+	if err != nil {
+		t.Fatalf("Unexpected marshal error: %v", err)
+	}
+
+	if out[0] != "prefix__String=hello" {
+		t.Fatalf("unexpected out %v", out)
+	}
+}
