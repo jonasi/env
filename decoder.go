@@ -6,10 +6,16 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 )
+
+func UnmarshalEnv(dest interface{}, opts *Options) error {
+	r := NewSliceReader(os.Environ())
+	return NewDecoder(r, opts).Decode(dest)
+}
 
 func Unmarshal(data []byte, dest interface{}, opts *Options) error {
 	return NewDecoder(bytes.NewReader(data), opts).Decode(dest)
