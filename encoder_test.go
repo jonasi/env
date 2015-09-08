@@ -1,6 +1,7 @@
 package env
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -46,7 +47,7 @@ func TestMarshal(t *testing.T) {
 		t.Fatalf("Unexpected marshal error: %v", err)
 	}
 
-	for _, v := range actual {
+	for _, v := range strings.Split(string(actual), "\n") {
 		if _, ok := expected[v]; !ok {
 			t.Errorf("Found %s not in expected values", v)
 		} else {
@@ -76,7 +77,7 @@ func TestMarshalPrefix(t *testing.T) {
 		t.Fatalf("Unexpected marshal error: %v", err)
 	}
 
-	if out[0] != "prefix__String=hello" {
-		t.Fatalf("unexpected out %v", out)
+	if string(out) != "prefix__String=hello" {
+		t.Fatalf("unexpected out %v", string(out))
 	}
 }

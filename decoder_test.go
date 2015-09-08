@@ -58,14 +58,14 @@ func TestUnmarshalSimple(t *testing.T) {
 
 	for _, v := range testSimple {
 		rv := reflect.New(reflect.TypeOf(v.value))
-		(&stringNode{value: v.string}).Decode(rv, opts)
+		decodeString(v.string, rv, opts)
 
 		if !reflect.DeepEqual(rv.Elem().Interface(), v.value) {
 			t.Errorf("decodeValue error for str %s and type %s.  Expected %v and got %v", v.string, rv.Type().String(), v.value, rv.Interface())
 		}
 
 		rv = rv.Elem()
-		(&stringNode{value: v.string}).Decode(rv, opts)
+		decodeString(v.string, rv, opts)
 
 		if !reflect.DeepEqual(rv.Interface(), v.value) {
 			t.Errorf("decodeValue error for str %s and type %s.  Expected %v and got %v", v.string, rv.Type().String(), v.value, rv.Interface())
@@ -90,15 +90,17 @@ func TestUnmarshalNestedStruct(t *testing.T) {
 		}
 	}
 
-	args := []string{
-		"Inside__X=hello",
-		"Inside__Y=something",
-		"Inside__y=else",
-		"Pointer__X=8",
-		"Deeper__EvenDeeper__X=true",
-	}
+	data := []byte(`
+Inside__X=hello
+Inside__Y=something
+Inside__y=else
+Pointer__X=8
+Deeper__EvenDeeper__X=true
+`)
 
-	Unmarshal(args, &dest, nil)
+	if err := Unmarshal(data, &dest, nil); err != nil {
+		t.Fatalf("Unexpected unmarshal error: %v", err)
+	}
 
 	if dest.Inside.X != "hello" {
 		t.Errorf("unexpected nested struct value.  Expected %s and found %s", "hello", dest.Inside.X)
@@ -122,13 +124,13 @@ func TestUnmarshalPrefix(t *testing.T) {
 		String string
 	}
 
-	args := []string{
-		"prefix__String=hello",
-	}
+	data := []byte("prefix__String=hello")
 
-	Unmarshal(args, &dest, &Options{
+	if err := Unmarshal(data, &dest, &Options{
 		Prefix: "prefix__",
-	})
+	}); err != nil {
+		t.Fatalf("Unexpected unmarshal error: %v", err)
+	}
 
 	if dest.String != "hello" {
 		t.Errorf("Expected %#v, found %#v", "hello", dest.String)
@@ -140,13 +142,13 @@ func TestUnmarshalMapper(t *testing.T) {
 		String string
 	}
 
-	args := []string{
-		"string=hello",
-	}
+	data := []byte("string=hello")
 
-	Unmarshal(args, &dest, &Options{
+	if err := Unmarshal(data, &dest, &Options{
 		Mapper: UnderscoreMapper,
-	})
+	}); err != nil {
+		t.Fatalf("Unexpected unmarshal error: %v", err)
+	}
 
 	if dest.String != "hello" {
 		t.Errorf("Expected %#v, found %#v", "hello", dest.String)
