@@ -12,15 +12,33 @@ import (
 	"strings"
 )
 
+// UnmarshalEnv parses os.Environ and stores the results in
+// the value pointed to by dest
 func UnmarshalEnv(dest interface{}, opts *Options) error {
 	r := NewSliceReader(os.Environ())
-	return NewDecoder(r, opts).Decode(dest)
+	return unmarshal(r, dest, opts)
 }
 
+// Unmarshal parses data and stores the results in the value
+// pointed to by dest
 func Unmarshal(data []byte, dest interface{}, opts *Options) error {
-	return NewDecoder(bytes.NewReader(data), opts).Decode(dest)
+	r := bytes.NewReader(data)
+	return unmarshal(r, dest, opts)
 }
 
+func unmarshal(r io.Reader, dest interface{}, opts *Options) error {
+	d := NewDecoder(r, opts)
+
+	for d.More() {
+		if err := d.Decode(dest); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// NewDecoder returns a new decoder that reads from r
 func NewDecoder(r io.Reader, opts *Options) *Decoder {
 	if opts == nil {
 		opts = &Options{}
@@ -31,14 +49,25 @@ func NewDecoder(r io.Reader, opts *Options) *Decoder {
 	return &Decoder{
 		r:    bufio.NewReader(r),
 		opts: opts,
+		more: true,
 	}
 }
 
+// A Decoder read k=v pairs from an input stream
 type Decoder struct {
 	r    *bufio.Reader
 	opts *Options
+	more bool
 }
 
+// More returns true if we have reached EOF on
+// the underlying reader
+func (d *Decoder) More() bool {
+	return d.more
+}
+
+// Decode reads the next k=v pair from the input
+// stream and stores the results in dest
 func (d *Decoder) Decode(dest interface{}) error {
 	rootVal := reflect.ValueOf(dest)
 
@@ -52,31 +81,30 @@ func (d *Decoder) Decode(dest interface{}) error {
 		return fmt.Errorf("Expected pointer to struct, got pointer to %s", rootVal.Kind())
 	}
 
-	for {
-		str, err := d.r.ReadString('\n')
+	str, err := d.r.ReadString('\n')
 
-		if len(str) > 0 {
-			if str[len(str)-1] == '\n' {
-				drop := 1
-				if len(str) > 1 && str[len(str)-2] == '\r' {
-					drop = 2
-				}
-
-				str = str[:len(str)-drop]
-			}
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				return d.decodeValue(rootVal, str)
+	if len(str) > 0 {
+		if str[len(str)-1] == '\n' {
+			drop := 1
+			if len(str) > 1 && str[len(str)-2] == '\r' {
+				drop = 2
 			}
 
-			return err
+			str = str[:len(str)-drop]
+		}
+	}
+
+	if err != nil {
+		if err == io.EOF {
+			d.more = false
+			return d.decodeValue(rootVal, str)
 		}
 
-		if err := d.decodeValue(rootVal, str); err != nil {
-			return err
-		}
+		return err
+	}
+
+	if err := d.decodeValue(rootVal, str); err != nil {
+		return err
 	}
 
 	return nil
@@ -135,6 +163,7 @@ func (d *Decoder) decodeValue(rv reflect.Value, str string) error {
 	return decodeString(v, cur, d.opts)
 }
 
+// DecodeString parses string for a go value and stores it in dest
 func DecodeString(str string, dest interface{}, opts *Options) error {
 	val := reflect.ValueOf(dest)
 	return decodeString(str, val, opts)

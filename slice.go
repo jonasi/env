@@ -7,6 +7,7 @@ import (
 
 var split = []byte{'\n'}
 
+// NewSliceWriter returns a SliceWriter
 func NewSliceWriter() *SliceWriter {
 	return &SliceWriter{
 		data: []string{},
@@ -14,6 +15,8 @@ func NewSliceWriter() *SliceWriter {
 	}
 }
 
+// SliceWriter implements the io.Write interface and writes
+// to an underlying []string
 type SliceWriter struct {
 	data []string
 	buf  []byte
@@ -48,6 +51,7 @@ func (s *SliceWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// Data returns a copy of the written data
 func (s *SliceWriter) Data() []string {
 	d := make([]string, len(s.data), cap(s.data))
 	copy(d, s.data)
@@ -55,6 +59,7 @@ func (s *SliceWriter) Data() []string {
 	return d
 }
 
+// NewSliceReader returns a SliceReader with underlying source d
 func NewSliceReader(d []string) *SliceReader {
 	var cp = make([]string, len(d))
 
@@ -73,6 +78,8 @@ func NewSliceReader(d []string) *SliceReader {
 	}
 }
 
+// SliceReader is an io.Reader that reads from a []string as \n delimited
+// []byte
 type SliceReader struct {
 	data  []string
 	slIdx int

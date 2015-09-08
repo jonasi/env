@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Marshal returns the env encoding of v
 func Marshal(v interface{}, opts *Options) ([]byte, error) {
 	var (
 		b bytes.Buffer
@@ -21,6 +22,7 @@ func Marshal(v interface{}, opts *Options) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// NewEncoder returns a new encoder that writes to w
 func NewEncoder(w io.Writer, opts *Options) *Encoder {
 	if opts == nil {
 		opts = &Options{}
@@ -34,11 +36,13 @@ func NewEncoder(w io.Writer, opts *Options) *Encoder {
 	}
 }
 
+// An Encoder writes env k=v pairs to an output stream
 type Encoder struct {
 	w    io.Writer
 	opts *Options
 }
 
+// Encode writes the env encoding to the stream
 func (e *Encoder) Encode(src interface{}) error {
 	rootVal := reflect.ValueOf(src)
 
@@ -98,6 +102,7 @@ func encodeStruct(w io.Writer, rv reflect.Value, opts *Options, prefix string, i
 	return nil
 }
 
+// EncodeString encodes and returns val as a string
 func EncodeString(val interface{}, opts *Options) string {
 	v := reflect.ValueOf(val)
 	return encodeString(v, opts)
