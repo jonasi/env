@@ -66,21 +66,8 @@ func (d *Decoder) More() bool {
 	return d.more
 }
 
-// Decode reads the next k=v pair from the input
-// stream and stores the results in dest
-func (d *Decoder) Decode(dest interface{}) error {
-	rootVal := reflect.ValueOf(dest)
-
-	if rootVal.Kind() != reflect.Ptr {
-		return fmt.Errorf("Expected pointer to struct, got %s", rootVal.Kind())
-	}
-
-	rootVal = rootVal.Elem()
-
-	if rootVal.Kind() != reflect.Struct {
-		return fmt.Errorf("Expected pointer to struct, got pointer to %s", rootVal.Kind())
-	}
-
+// Pair returns the next k=v pair from the input stream
+func (d *Decoder) Pair() (string, string, error) {
 	str, err := d.r.ReadString('\n')
 
 	if len(str) > 0 {
@@ -97,25 +84,41 @@ func (d *Decoder) Decode(dest interface{}) error {
 	if err != nil {
 		if err == io.EOF {
 			d.more = false
-			return d.decodeValue(rootVal, str)
+		} else {
+			return "", "", err
 		}
-
-		return err
 	}
 
-	if err := d.decodeValue(rootVal, str); err != nil {
-		return err
+	parts := strings.SplitN(str, "=", 2)
+	v := ""
+
+	if len(parts) > 1 {
+		v = strings.TrimSpace(parts[1])
 	}
 
-	return nil
+	return parts[0], v, err
 }
 
-func (d *Decoder) decodeValue(rv reflect.Value, str string) error {
-	var (
-		parts = strings.SplitN(str, "=", 2)
-		key   = parts[0]
-		v     string
-	)
+// Decode reads the next k=v pair from the input
+// stream and stores the results in dest
+func (d *Decoder) Decode(dest interface{}) error {
+	rootVal := reflect.ValueOf(dest)
+
+	if rootVal.Kind() != reflect.Ptr {
+		return fmt.Errorf("Expected pointer to struct, got %s", rootVal.Kind())
+	}
+
+	rootVal = rootVal.Elem()
+
+	if rootVal.Kind() != reflect.Struct {
+		return fmt.Errorf("Expected pointer to struct, got pointer to %s", rootVal.Kind())
+	}
+
+	key, val, err := d.Pair()
+
+	if err != nil && err != io.EOF {
+		return err
+	}
 
 	if d.opts.Prefix != "" {
 		if !strings.HasPrefix(key, d.opts.Prefix) {
@@ -125,15 +128,9 @@ func (d *Decoder) decodeValue(rv reflect.Value, str string) error {
 		key = key[len(d.opts.Prefix):]
 	}
 
-	if len(parts) > 1 {
-		v = parts[1]
-	}
-
-	v = strings.TrimSpace(v)
-
 	var (
 		kparts  = strings.Split(key, d.opts.Separator)
-		cur, ok = deref(rv)
+		cur, ok = deref(rootVal)
 	)
 
 	if !ok {
@@ -160,7 +157,7 @@ func (d *Decoder) decodeValue(rv reflect.Value, str string) error {
 		}
 	}
 
-	return decodeString(v, cur, d.opts)
+	return decodeString(val, cur, d.opts)
 }
 
 // DecodeString parses string for a go value and stores it in dest
